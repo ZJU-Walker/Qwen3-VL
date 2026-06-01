@@ -9,13 +9,25 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=kewalk@stanford.edu
-#SBATCH --output=/iris/projects/humanoid/Qwen3-VL/logs/qwen3vl_subtask_8b_0527/%x-%j.out
-#SBATCH --error=/iris/projects/humanoid/Qwen3-VL/logs/qwen3vl_subtask_8b_0527/%x-%j.err
+# Logs are relative to the submit directory (Slurm reads these before the script
+# runs, so they cannot use shell variables). Run sbatch from the repo root after
+# `mkdir -p logs/qwen3vl_subtask_8b_0527`.
+#SBATCH --output=logs/qwen3vl_subtask_8b_0527/%x-%j.out
+#SBATCH --error=logs/qwen3vl_subtask_8b_0527/%x-%j.err
 
 set -euo pipefail
 
+# REPO_ROOT auto-derives from this script's own location, so the same sbatch
+# works unchanged from any checkout (e.g. /iris/projects/humanoid/Qwen3-VL or
+# /iris/u/kewalk/Qwen3-VL). Slurm copies the script to a spool dir, so prefer
+# the original submit path it records before falling back to BASH_SOURCE.
 HUMANOID_ROOT=/iris/projects/humanoid
-REPO_ROOT=/iris/projects/humanoid/Qwen3-VL
+if [ -n "${SLURM_JOB_ID:-}" ] && command -v scontrol >/dev/null 2>&1; then
+    _script_path=$(scontrol show job "${SLURM_JOB_ID}" 2>/dev/null \
+        | sed -n 's/.*Command=\([^ ]*\).*/\1/p' | head -1)
+fi
+_script_path="${_script_path:-${BASH_SOURCE[0]}}"
+REPO_ROOT=$(cd "$(dirname "${_script_path}")/.." && pwd)
 CONDA_ROOT="${HUMANOID_ROOT}/miniconda3"
 CONDA_ENV_PATH="${CONDA_ROOT}/envs/qwen3vl"
 RUN_NAME=${RUN_NAME:-qwen3vl-8b-trossen-block-subtask-0528-mix-2cls-hist5-5f}
