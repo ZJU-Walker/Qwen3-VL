@@ -23,6 +23,25 @@ class DataArguments:
     video_max_pixels: int = field(default=1024 * 28 * 28)
     video_min_pixels: int = field(default=256 * 28 * 28)
     video_fps: float = 2
+    # CSV / root / camera are empty by default: they come from the dataset
+    # registry entry (qwenvl/data/__init__.py). Set any of these to override
+    # the registry for a one-off run.
+    robot_subtask_csv: str = field(default="")
+    robot_subtask_root: str = field(default="")
+    robot_subtask_camera: str = field(default="")
+    # Empty by default: the prompt comes from the dataset registry entry
+    # (qwenvl/data/__init__.py). Set this only to override the registry per-run.
+    robot_subtask_prompt: str = field(default="")
+    robot_subtask_history_seconds: float = field(default=5.0)
+    robot_subtask_num_frames: int = field(default=5)
+    # Lookahead horizon (frames): label = subtask at (current_frame + this), clamped
+    # to episode end. 15 frames = 0.5s at 30fps. Makes the model anticipate the next
+    # subtask rather than describe the current frame.
+    robot_subtask_lookahead_frames: int = field(default=15)
+    robot_subtask_epoch_size: int = field(default=4096)
+    robot_subtask_split: str = field(default="train")
+    robot_subtask_train_episodes: str = field(default="0:52")
+    robot_subtask_val_episodes: str = field(default="52:61")
 
 
 @dataclass

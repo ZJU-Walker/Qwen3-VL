@@ -1,0 +1,7 @@
+*.err
+*.out
+logs/
+*.pyc
+wandb/
+qwen-vl-finetune/output
+qwen-vl-finetune/...

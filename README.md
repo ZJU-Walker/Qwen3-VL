@@ -1,5 +1,105 @@
-# Qwen3-VL
+# Qwen3-VL — Trossen Robot Subtask Fine-Tuning
 
+Fine-tunes `Qwen/Qwen3-VL-8B-Instruct` to predict the robot's next subtask from a
+short `cam_high` video history. The model reads a backward window of frames and
+predicts the subtask the robot should perform next (a lookahead label).
+
+The task is defined entirely by a **segment CSV** — switching to a new task with
+the same data format requires **no code changes**, only a new CSV and a registry
+entry. The subtask label set is derived automatically from the CSV's `subtask`
+column, so it works for any number of classes.
+
+## Train
+
+On Slurm with 2 H200 GPUs (uses the default `trossen_block_mem_0528` task):
+
+```bash
+sbatch cluster_scripts/train_qwen3vl_robot_subtask_h200.sbatch
+```
+
+For an interactive/manual launch:
+
+```bash
+export NPROC_PER_NODE=2
+bash qwen-vl-finetune/scripts/sft_robot_subtask_8b.sh
+```
+
+### Train on a different task
+
+Each task is a named entry in the dataset registry,
+`qwen-vl-finetune/qwenvl/data/__init__.py`. To add a new one, copy the
+`TROSSEN_BLOCK_MEM_0528` entry, point `annotation_path` at your new segment CSV,
+set a task-appropriate `prompt`, and register it under a new key:
+
+```python
+TROSSEN_NEW_TASK_0601 = {
+    "dataset_type": "robot_subtask",
+    "annotation_path": ".../subtask_segments_new_0601.csv",
+    "data_path": "/iris/projects/humanoid/trossen_data",
+    "camera": "observation.images.cam_high",
+    "prompt": "Predict the subtask the robot should perform: ...",  # name the classes
+}
+# in data_dict:
+#   "trossen_new_task_0601": TROSSEN_NEW_TASK_0601,
+```
+
+Then select it at launch with `DATASETS` — the registry supplies the CSV, data
+root, camera, and prompt; labels and balanced sampling follow automatically:
+
+```bash
+DATASETS=trossen_new_task_0601 \
+RUN_NAME=qwen3vl-8b-trossen-new-task-0601 \
+OUTPUT_DIR=qwen-vl-finetune/output/qwen3vl-8b-trossen-new-task-0601 \
+TRAIN_EPISODES=0:80 VAL_EPISODES=80:90 \
+bash qwen-vl-finetune/scripts/sft_robot_subtask_8b.sh
+```
+
+The CSV must have columns `dataset,episode_id,start_frame,end_frame,subtask`. The
+`dataset` column names the LeRobot folder under the data root; `subtask` defines
+the label set.
+
+### Common overrides
+
+All optional; defaults come from the launcher / registry entry.
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `DATASETS` | `trossen_block_mem_0528` | Registry key of the task to train |
+| `RUN_NAME` / `OUTPUT_DIR` | see script | W&B run name / checkpoint dir |
+| `MODEL_PATH` | `Qwen/Qwen3-VL-8B-Instruct` | Base model |
+| `TRAIN_EPISODES` / `VAL_EPISODES` | `0:52` / `52:61` | Episode index ranges |
+| `EPOCHS` | `10` | Training epochs |
+| `ROBOT_SUBTASK_EPOCH_SIZE` | `4096` | Sampled windows per epoch |
+| `LR` / `BATCH_SIZE` / `GRAD_ACCUM_STEPS` | `1e-6` / `4` / `4` | Optimizer knobs |
+| `SAVE_STEPS` | `200` | Checkpoint interval (optimizer steps) |
+| `LOOKAHEAD_FRAMES` | `15` | Label = subtask at `current_frame + this` |
+| `ROBOT_SUBTASK_CSV/ROOT/CAMERA/PROMPT` | from registry | One-off overrides of the registry entry |
+
+Training is full (non-LoRA) SFT with the language model and multimodal merger
+trainable; the vision tower is frozen.
+
+## Rollout
+
+Run frame-by-frame inference on a single raw mp4 and render a panel video
+(history frames on the left, current frame + prediction overlay on the right):
+
+```bash
+CKPT=qwen-vl-finetune/output/qwen3vl-8b-trossen-block-subtask-0528-mix-2cls-hist5-5f/checkpoint-200
+
+python qwen-vl-finetune/tools/rollout_robot_subtask_video.py \
+  --model-name-or-path "$CKPT" \
+  --processor-name-or-path Qwen/Qwen3-VL-8B-Instruct \
+  --video /iris/projects/humanoid/trossen_data/plate_test/sanity_check/ep000000_cam_high_first1s.mp4 \
+  --labels-csv /iris/projects/humanoid/trossen_data/scripts/labels/subtask_segments_mix_block_0528_auto.csv \
+  --history-seconds 5 --num-frames 5 --bf16 --panel \
+  --output-dir "$CKPT/rollout_sanity_check"
+```
+
+`--history-seconds` / `--num-frames` must match training. Pass `--labels-csv`
+(the same CSV the checkpoint trained on) so the valid label set and overlay
+colors match the task; alternatively pass `--labels A B C` explicitly.
+
+---
 
 <p align="center">
     <img src="https://qianwen-res.oss-accelerate.aliyuncs.com/Qwen3-VL/qwen3vllogo.png" width="400"/>

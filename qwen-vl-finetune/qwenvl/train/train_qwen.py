@@ -89,8 +89,13 @@ def set_model(model_args, model):
         model.lm_head.requires_grad = False
 
 
-def train(attn_implementation="flash_attention_2"):
+def train(attn_implementation=None):
     global local_rank
+
+    if attn_implementation is None:
+        attn_implementation = os.environ.get(
+            "QWEN_ATTN_IMPLEMENTATION", "flash_attention_2"
+        )
 
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
@@ -203,4 +208,4 @@ def train(attn_implementation="flash_attention_2"):
 
 
 if __name__ == "__main__":
-    train(attn_implementation="flash_attention_2")
+    train()

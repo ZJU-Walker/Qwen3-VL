@@ -26,12 +26,35 @@ VIDEOCHATGPT = {
     "data_path": "PATH_TO_VIDEOCHATGPT_DATA",
 }
 
+# --- Robot subtask (Trossen) tasks ------------------------------------------
+# To add a NEW task: copy the entry below, point `annotation_path` at the new
+# segment CSV, and register it in `data_dict`. The subtask label set is derived
+# automatically from that CSV's `subtask` column -- no code changes elsewhere.
+# All entries share `dataset_type: "robot_subtask"`, which routes them to
+# RobotSubtaskDataset. Select one at train time with DATASETS=<key>.
+#   - annotation_path: segment CSV (dataset,episode_id,start_frame,end_frame,subtask,...)
+#   - data_path:       LeRobot data root holding the dataset folder(s) from the CSV
+#   - camera:          which camera stream to read windows from
+#   - prompt:          task instruction shown to the model (task-specific)
+TROSSEN_BLOCK_MEM_0528 = {
+    "dataset_type": "robot_subtask",
+    "annotation_path": "/iris/projects/humanoid/trossen_data/scripts/labels/subtask_segments_mix_block_0528_auto.csv",
+    "data_path": "/iris/projects/humanoid/trossen_data",
+    "camera": "observation.images.cam_high",
+    "prompt": (
+        "Predict the subtask the robot should perform: put the green block to "
+        "the plate, or put the yellow block to the plate."
+    ),
+}
+
 data_dict = {
     "cambrian_737k": CAMBRIAN_737K,
     "cambrian_737k_pack": CAMBRIAN_737K_PACK,
     "mp_doc": MP_DOC,
     "clevr_mc": CLEVR_MC,
     "videochatgpt": VIDEOCHATGPT,
+    # robot subtask tasks (add new ones here)
+    "trossen_block_mem_0528": TROSSEN_BLOCK_MEM_0528,
 }
 
 
